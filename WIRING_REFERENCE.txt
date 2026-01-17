@@ -1,0 +1,149 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   XIAO ESP32S3 Sense MP3 Player — Quick Wiring Reference                      ║
+║   Version 1.0.0                                                               ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  XIAO ESP32S3 PINOUT (Front View)                                             │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+                      ┌─────────────────────────┐
+                      │        [USB-C]          │
+                      │                         │
+   D0  = GPIO1  ──────┤●                       ●├────── 5V
+   D1  = GPIO2  ──────┤●                       ●├────── GND
+   D2  = GPIO3  ──────┤●                       ●├────── 3V3
+   D3  = GPIO4  ──────┤●                       ●├────── D10 = GPIO9  (MOSI)
+   D4  = GPIO5  ──────┤●                       ●├────── D9  = GPIO8  (MISO)
+   D5  = GPIO6  ──────┤●                       ●├────── D8  = GPIO7  (SCK)
+   D6  = GPIO43 ──────┤●                       ●├────── D7  = GPIO44
+                      │                         │
+                      │     [SD Card Slot]      │
+                      │    (on expansion board) │
+                      └─────────────────────────┘
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  WIRING TABLE                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   XIAO Pin   │  GPIO   │  Function        │  Connect To
+  ────────────┼─────────┼──────────────────┼────────────────────────────────
+   D0         │  GPIO1  │  I2S BCLK        │  MAX98357A BCLK pin
+   D1         │  GPIO2  │  I2S LRC         │  MAX98357A LRC pin
+   D2         │  GPIO3  │  I2S DOUT        │  MAX98357A DIN pin
+   D3         │  GPIO4  │  Encoder CLK     │  Rotary Encoder CLK (A)
+   D4         │  GPIO5  │  Encoder DT      │  Rotary Encoder DT (B)
+   D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (button)
+   D8         │  GPIO7  │  LED Blue        │  RGB LED Blue + 220Ω resistor
+   D9         │  GPIO8  │  LED Green       │  RGB LED Green + 220Ω resistor
+   D10        │  GPIO9  │  LED Red         │  RGB LED Red + 220Ω resistor
+   3V3        │  -      │  3.3V Power      │  Encoder VCC, MAX98357A VIN
+   GND        │  -      │  Ground          │  All component grounds
+   5V         │  -      │  5V Power        │  (optional: MAX98357A for louder)
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  MAX98357A I2S AMPLIFIER                                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   MAX98357A Pin    Connect To
+  ─────────────────────────────────────────
+   VIN              3V3 (or 5V for louder)
+   GND              GND
+   BCLK             D0 (GPIO1)
+   LRC              D1 (GPIO2)
+   DIN              D2 (GPIO3)
+   SD               Leave floating or tie to VIN (enable)
+   GAIN             Floating=12dB, VIN=15dB, GND=9dB
+   + / -            Speaker terminals (4Ω or 8Ω)
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  KY-040 ROTARY ENCODER                                                        │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   Encoder Pin      Connect To
+  ─────────────────────────────────────────
+   CLK              D3 (GPIO4)
+   DT               D4 (GPIO5)
+   SW               D5 (GPIO6)
+   +  (VCC)         3V3
+   GND              GND
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  RGB LED (Common Cathode)                                                     │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+                    220Ω
+   D10 (GPIO9) ────/\/\/\────┐
+                             │   ┌─────┐
+                    220Ω     ├───│ RED │
+   D9  (GPIO8) ────/\/\/\────┼───│ GRN │──── LED
+                             ├───│ BLU │
+                    220Ω     │   └─────┘
+   D8  (GPIO7) ────/\/\/\────┘
+                                   │
+   GND ────────────────────────────┘ (Common Cathode)
+
+   For Common Anode: Connect common pin to 3V3, set RGB_ACTIVE_LOW = true
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  SD CARD                                                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   • Uses the built-in slot on the Sense expansion board
+   • No external wiring required (internal GPIO21 for CS)
+   • Format: FAT32
+   • Files: 01.mp3, 02.mp3, 03.mp3, 04.mp3, 05.mp3, 06.mp3, 07.mp3, 08.mp3, 09.mp3
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  CONTROLS                                                                     │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   Action                      Result
+  ─────────────────────────────────────────
+   Rotate clockwise            Volume up
+   Rotate counter-clockwise    Volume down
+   Short press (<500ms)        Play / Pause (pause = sleep)
+   Long press (≥500ms)         Skip to next track
+   Any input while sleeping    Wake and resume playback
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  LED BEHAVIOR                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   State              LED Effect
+  ─────────────────────────────────────────
+   Playing            Breathing rainbow glow
+   Track change       Solid color (1.5 sec)
+   Paused / Sleep     LED off (low power)
+   Error              Pulsing red
+
+   Track Colors:
+     1: Red        4: Green      7: Purple
+     2: Orange     5: Cyan       8: Pink
+     3: Yellow     6: Blue       9: White
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                                              │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   Problem                     Solution
+  ─────────────────────────────────────────
+   SD card not detected        Check FAT32 format, try different card
+   No audio output             Verify BCLK, LRC, DIN wiring
+   Audio crackling             Separate power supply for amp, reduce volume
+   Encoder reversed            Swap CLK and DT wires
+   LED colors wrong            Check resistors, verify cathode/anode type
+
+
+═══════════════════════════════════════════════════════════════════════════════
