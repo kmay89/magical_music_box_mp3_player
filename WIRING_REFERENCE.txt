@@ -1,9 +1,24 @@
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
 ║   XIAO ESP32S3 Sense MP3 Player — Quick Wiring Reference                      ║
-║   Version 1.0.0                                                               ║
+║   Version 1.0.2                                                               ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  ARDUINO IDE SETTINGS (CRITICAL!)                                         │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   Board:              XIAO_ESP32S3  (NOT "ESP32S3 Dev Module"!)
+   USB CDC On Boot:    Enabled
+   Partition Scheme:   Huge APP (3MB No OTA/1MB SPIFFS)  <-- REQUIRED!
+   Flash Mode:         QIO 80MHz
+   
+   ⚠️  The default partition is too small! The audio library pulls in 
+       WiFi/Network dependencies making the sketch ~1.8MB. The default 
+       partition only allows 1.3MB. You MUST select "Huge APP" or you 
+       will get "Sketch too big" errors.
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -35,9 +50,9 @@
    D0         │  GPIO1  │  I2S BCLK        │  MAX98357A BCLK pin
    D1         │  GPIO2  │  I2S LRC         │  MAX98357A LRC pin
    D2         │  GPIO3  │  I2S DOUT        │  MAX98357A DIN pin
-   D3         │  GPIO4  │  Encoder CLK     │  Rotary Encoder CLK (A)
-   D4         │  GPIO5  │  Encoder DT      │  Rotary Encoder DT (B)
-   D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (button)
+   D3         │  GPIO4  │  Encoder CLK     │  Rotary Encoder CLK (rotation)
+   D4         │  GPIO5  │  Encoder DT      │  Rotary Encoder DT (direction)
+   D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (push button)
    D8         │  GPIO7  │  LED Blue        │  RGB LED Blue + 220Ω resistor
    D9         │  GPIO8  │  LED Green       │  RGB LED Green + 220Ω resistor
    D10        │  GPIO9  │  LED Red         │  RGB LED Red + 220Ω resistor
@@ -50,34 +65,96 @@
 │  MAX98357A I2S AMPLIFIER                                                      │
 └───────────────────────────────────────────────────────────────────────────────┘
 
-   MAX98357A Pin    Connect To
-  ─────────────────────────────────────────
-   VIN              3V3 (or 5V for louder)
-   GND              GND
-   BCLK             D0 (GPIO1)
-   LRC              D1 (GPIO2)
-   DIN              D2 (GPIO3)
-   SD               Leave floating or tie to VIN (enable)
-   GAIN             Floating=12dB, VIN=15dB, GND=9dB
-   + / -            Speaker terminals (4Ω or 8Ω)
+   REQUIRED CONNECTIONS:
+   ─────────────────────────────────────────────────────────────────────────────
+   MAX98357A Pin    Connect To           Purpose
+   ──────────────   ─────────────────    ───────────────────────────────────────
+   VIN              3V3 (or 5V)          Power. 5V = louder max output.
+   GND              GND                  Ground reference.
+   BCLK             D0 (GPIO1)           I2S bit clock (timing for audio bits)
+   LRC              D1 (GPIO2)           I2S word select (L/R channel timing)
+   DIN              D2 (GPIO3)           I2S data (actual audio samples)
+   + / -            Speaker terminals    Connect 4Ω or 8Ω speaker
+
+   OPTIONAL PINS:
+   ─────────────────────────────────────────────────────────────────────────────
+
+   GAIN PIN — Sets FIXED amplifier boost (NOT volume control!)
+   ─────────────────────────────────────────────────────────────────────────────
+   The GAIN pin sets how much the amplifier boosts the signal AFTER the 
+   software volume control. Think of it like the "master gain" on a mixer.
+
+      Connection          Boost Level    When to use
+      ─────────────────   ───────────    ────────────────────────────────────
+      Floating (NC)       +9dB           Default. Start here.
+      Tied to GND         +12dB          If audio too quiet at max volume.
+      Tied to VIN         +15dB          Maximum boost. May distort.
+
+   VOLUME IS CONTROLLED IN SOFTWARE via the audio library (0-21 levels).
+   The rotary encoder adjusts this software volume. No hardware needed!
+   GAIN just makes the overall output louder/quieter at any given volume.
+
+   SD PIN — Shutdown/Enable control
+   ─────────────────────────────────────────────────────────────────────────────
+   Controls whether the amplifier is active or muted.
+
+      Connection          Result
+      ─────────────────   ────────────────────────────────────────────────────
+      Floating (NC)       Amplifier ENABLED (normal operation)
+      Tied to VIN         Amplifier ENABLED (same as floating)
+      Tied to GND         Amplifier DISABLED (muted, low power)
+
+   For this project: Leave floating or tie to VIN.
+   Advanced: Connect to a spare GPIO for hardware mute control.
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  KY-040 ROTARY ENCODER                                                        │
+│  KY-040 ROTARY ENCODER (5 pins: CLK, DT, SW, +, GND)                          │
 └───────────────────────────────────────────────────────────────────────────────┘
 
-   Encoder Pin      Connect To
-  ─────────────────────────────────────────
-   CLK              D3 (GPIO4)
-   DT               D4 (GPIO5)
-   SW               D5 (GPIO6)
-   +  (VCC)         3V3
-   GND              GND
+   The rotary encoder has TWO functions:
+     1. ROTATION — detected via CLK and DT pins (volume control)
+     2. PUSH BUTTON — the SW pin (play/pause/skip)
+
+   Pin Connections:
+   ─────────────────────────────────────────────────────────────────────────────
+   Encoder Pin      Connect To      Purpose
+   ─────────────    ────────────    ────────────────────────────────────────────
+   CLK              D3 (GPIO4)      Clock pulse — one pulse per "click" (detent)
+   DT               D4 (GPIO5)      Direction — phase vs CLK determines CW/CCW
+   SW               D5 (GPIO6)      Push button — built into encoder shaft
+   +  (VCC)         3V3             Power for encoder logic
+   GND              GND             Ground
+
+   Rotation Detection (CLK + DT):
+   ─────────────────────────────────────────────────────────────────────────────
+   - When you rotate, CLK produces pulses at each detent (click)
+   - DT is 90° out of phase with CLK
+   - If DT is HIGH when CLK goes LOW → clockwise → volume UP
+   - If DT is LOW when CLK goes LOW → counter-clockwise → volume DOWN
+
+   Push Button (SW):
+   ─────────────────────────────────────────────────────────────────────────────
+   - Most rotary encoders have a push button built into the shaft
+   - Pressing down on the knob activates the switch
+   - SW is active LOW: normally HIGH, goes LOW when pressed
+   - Internal pull-up resistor is enabled in software
+   - Short press (<500ms): Play/Pause
+   - Long press (≥500ms): Skip to next track
+
+   Troubleshooting:
+   ─────────────────────────────────────────────────────────────────────────────
+   - Volume direction reversed? Swap CLK and DT wires
+   - Button not working? Check SW wire and that encoder has a push switch
+   - Some cheap encoders omit the push button — verify yours has SW pin
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  RGB LED (Common Cathode)                                                     │
+│  RGB LED                                                                      │
 └───────────────────────────────────────────────────────────────────────────────┘
+
+   COMMON CATHODE LED (most common - connect common pin to GND):
+   ─────────────────────────────────────────────────────────────────────────────
 
                     220Ω
    D10 (GPIO9) ────/\/\/\────┐
@@ -88,9 +165,20 @@
                     220Ω     │   └─────┘
    D8  (GPIO7) ────/\/\/\────┘
                                    │
-   GND ────────────────────────────┘ (Common Cathode)
+   GND ────────────────────────────┘ (Common Cathode to GND)
 
-   For Common Anode: Connect common pin to 3V3, set RGB_ACTIVE_LOW = true
+   In code: RGB_ACTIVE_LOW = false (HIGH turns LED on)
+
+   COMMON ANODE LED (connect common pin to 3V3):
+   ─────────────────────────────────────────────────────────────────────────────
+   Same wiring, but connect common pin to 3V3 instead of GND.
+   In code: RGB_ACTIVE_LOW = true (LOW turns LED on)
+
+   RESISTOR VALUES:
+   ─────────────────────────────────────────────────────────────────────────────
+   220Ω = bright, 330Ω = medium, 470Ω = dim
+   Without resistors you WILL burn out the LED or GPIO pins!
+   All three colors should use similar resistor values for balanced white.
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -138,12 +226,17 @@
 └───────────────────────────────────────────────────────────────────────────────┘
 
    Problem                     Solution
-  ─────────────────────────────────────────
+   ─────────────────────────────────────────────────────────────────────────────
+   "Sketch too big" error      Select "Huge APP (3MB No OTA)" partition scheme!
+   Wrong board selected        Use "XIAO_ESP32S3", NOT "ESP32S3 Dev Module"
    SD card not detected        Check FAT32 format, try different card
-   No audio output             Verify BCLK, LRC, DIN wiring
-   Audio crackling             Separate power supply for amp, reduce volume
+   No audio output             Verify BCLK, LRC, DIN wiring to amp
+   Audio too quiet             Tie GAIN to VIN for +15dB boost
+   Audio distorts              Tie GAIN to GND for +12dB, or reduce volume
+   Volume doesn't work         Volume is software-controlled, check encoder
    Encoder reversed            Swap CLK and DT wires
    LED colors wrong            Check resistors, verify cathode/anode type
+   LED too dim                 Use smaller resistors (220Ω instead of 470Ω)
 
 
 ═══════════════════════════════════════════════════════════════════════════════
