@@ -2,7 +2,7 @@
 
 A magical little music box with organic LED breathing effects, built for the Seeed Studio XIAO ESP32S3 Sense.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-ESP32--S3-orange)
 
@@ -57,6 +57,8 @@ A magical little music box with organic LED breathing effects, built for the See
 
 ## 📌 Wiring
 
+### Main Connections
+
 ```
 XIAO ESP32S3 Sense          External Components
 ─────────────────           ────────────────────
@@ -72,6 +74,67 @@ D10 (GPIO9)  ──[220Ω]───────> RGB LED Red
 3V3          ───────────────> Encoder VCC, MAX98357A VIN
 GND          ───────────────> All grounds, LED common (cathode)
 ```
+
+### MAX98357A I2S Amplifier — Complete Pin Reference
+
+| Pin | Required? | Connect To | Purpose |
+|-----|-----------|------------|---------|
+| **VIN** | ✅ Yes | 3V3 or 5V | Power input. 5V = louder max output. |
+| **GND** | ✅ Yes | GND | Ground reference. |
+| **BCLK** | ✅ Yes | D0 (GPIO1) | I2S bit clock — timing for audio bits. |
+| **LRC** | ✅ Yes | D1 (GPIO2) | I2S word select — left/right channel timing. |
+| **DIN** | ✅ Yes | D2 (GPIO3) | I2S data — actual audio samples. |
+| **GAIN** | ❌ Optional | See below | Sets amplifier gain (NOT volume control!). |
+| **SD** | ❌ Optional | See below | Shutdown pin — enables/disables amp. |
+
+#### GAIN Pin (Amplifier Boost Level)
+
+The GAIN pin sets a **fixed hardware amplification level**. This is NOT the same as volume control!
+
+| GAIN Connection | Boost Level | When to Use |
+|-----------------|-------------|-------------|
+| Floating (NC) | +9dB | Default. Good starting point. |
+| Tied to GND | +12dB | If audio is too quiet at max volume. |
+| Tied to VIN | +15dB | Maximum boost. May distort at high volume. |
+
+**Volume control** is handled in software via the I2S audio library (0-21 levels). The rotary encoder adjusts this software volume. No hardware connection needed for volume!
+
+#### SD Pin (Shutdown/Enable)
+
+The SD pin enables or disables the amplifier output.
+
+| SD Connection | Result |
+|---------------|--------|
+| Floating (NC) | Amplifier **enabled** (normal operation) |
+| Tied to VIN | Amplifier **enabled** (same as floating) |
+| Tied to GND | Amplifier **disabled** (muted, low power) |
+
+For this project, leave SD floating or tie to VIN. You could optionally connect it to a spare GPIO for hardware mute control.
+
+### Rotary Encoder (KY-040) — 5 Pins
+
+The encoder provides **two functions**: rotation for volume control, and a built-in push button for playback control.
+
+| Pin | Connect To | Purpose |
+|-----|------------|---------|
+| **CLK** | D3 (GPIO4) | Clock pulse — one pulse per detent (click) |
+| **DT** | D4 (GPIO5) | Direction — phase relationship determines CW/CCW |
+| **SW** | D5 (GPIO6) | Push button — built into encoder shaft, active LOW |
+| **+** (VCC) | 3V3 | Power |
+| **GND** | GND | Ground |
+
+**Rotation** (CLK + DT): Rotate the knob to adjust volume. The code detects direction by comparing CLK and DT phase.
+
+**Push Button** (SW): Press down on the encoder knob. Short press = play/pause, long press = next track.
+
+### RGB LED
+
+| Pin | Connect To | Notes |
+|-----|------------|-------|
+| Red | D10 (GPIO9) via 220Ω resistor | Current limiting required! |
+| Green | D9 (GPIO8) via 220Ω resistor | 220-470Ω is fine |
+| Blue | D8 (GPIO7) via 220Ω resistor | Lower = brighter |
+| Common | GND (cathode) or 3V3 (anode) | Set `RGB_ACTIVE_LOW` in code |
 
 ### Pinout Reference
 
@@ -119,12 +182,18 @@ Install via Arduino Library Manager:
 
 ## ⚙️ Arduino IDE Settings
 
-| Setting | Value |
-|---------|-------|
-| Board | XIAO_ESP32S3 |
-| USB CDC On Boot | Enabled |
-| Flash Mode | QIO 80MHz |
-| Partition Scheme | Default 4MB with spiffs |
+> ⚠️ **IMPORTANT**: The default partition scheme is too small! You MUST change it or compilation will fail with "Sketch too big".
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Board | **XIAO_ESP32S3** | NOT "ESP32S3 Dev Module"! |
+| USB CDC On Boot | Enabled | Required for Serial Monitor |
+| Partition Scheme | **Huge APP (3MB No OTA/1MB SPIFFS)** | ⚠️ REQUIRED! |
+| Flash Mode | QIO 80MHz | Default is fine |
+
+### Why the partition scheme matters
+
+The ESP32-audioI2S library pulls in WiFi/Network dependencies even though we don't use them. This makes the sketch ~1.8MB, but the default "4MB with spiffs" partition only allows 1.3MB for the app. Selecting "Huge APP" gives 3MB for the app, which is plenty.
 
 ## 🖥️ Serial Monitor Output
 
