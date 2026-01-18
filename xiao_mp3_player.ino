@@ -193,7 +193,9 @@
 #define SERVO_PWM_FREQ      50
 #define SERVO_PWM_BITS      16
 #define SERVO_STOP_US       1500
-#define SERVO_RECORD_US     1620
+#define SERVO_RECORD_US     1660
+#define SERVO_START_US      1750
+#define SERVO_START_MS      250
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACK DATA
@@ -252,7 +254,9 @@ static bool        g_sdReady  = false;
 static bool        g_sleeping = false;
 static bool        g_servoArmed = false;
 static bool        g_servoSpinning = false;
+static bool        g_servoBoosting = false;
 static unsigned long g_servoSkidUntil = 0;
+static unsigned long g_servoBoostUntil = 0;
 static int         g_servoMode = 0;
 
 static int           g_encLastCLK  = HIGH;
@@ -288,12 +292,21 @@ static void stopServo() {
   if (!g_servoSpinning) return;
   setServoPulseUs(SERVO_STOP_US);
   g_servoSpinning = false;
+  g_servoBoosting = false;
 }
 
 static void spinServo() {
-  if (g_servoSpinning) return;
-  setServoPulseUs(SERVO_RECORD_US);
-  g_servoSpinning = true;
+  if (!g_servoSpinning) {
+    setServoPulseUs(SERVO_START_US);
+    g_servoBoostUntil = millis() + SERVO_START_MS;
+    g_servoBoosting = true;
+    g_servoSpinning = true;
+    return;
+  }
+  if (g_servoBoosting && millis() >= g_servoBoostUntil) {
+    setServoPulseUs(SERVO_RECORD_US);
+    g_servoBoosting = false;
+  }
 }
 
 static void reportServoMode(int mode) {
@@ -819,6 +832,7 @@ void setup() {
   pinMode(PIN_ENC_CLK, INPUT_PULLUP);
   pinMode(PIN_ENC_DT, INPUT_PULLUP);
   pinMode(PIN_ENC_SW, INPUT_PULLUP);
+  pinMode(PIN_SERVO_CTRL, OUTPUT);
   g_encLastCLK = digitalRead(PIN_ENC_CLK);
   printSuccess("GPIO ready");
   
