@@ -4,7 +4,7 @@
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  * 
  * @file      xiao_mp3_player.ino
- * @brief     SD card MP3 player with rotary encoder and RGB LED feedback
+ * @brief     SD card MP3 player with rotary encoder and dual-color LED feedback
  * @version   1.0.2
  * @date      2025-01-17
  * @hardware  Seeed Studio XIAO ESP32S3 Sense
@@ -34,9 +34,8 @@
  *   D3         4      Encoder CLK           Rotary Encoder CLK (rotation pulse)
  *   D4         5      Encoder DT            Rotary Encoder DT (rotation direction)
  *   D5         6      Encoder SW            Rotary Encoder SW (push button)
- *   D8         7      LED Blue              RGB LED Blue + 220Ω resistor
- *   D9         8      LED Green             RGB LED Green + 220Ω resistor
- *   D10        9      LED Red               RGB LED Red + 220Ω resistor
+ *   D6         43     LED Green             LED Green + 220Ω resistor
+ *   D7         44     LED Blue              LED Blue + 220Ω resistor
  *   3V3        -      3.3V Power            Encoder +/VCC, MAX98357A VIN
  *   GND        -      Ground                All grounds, LED cathode
  * 
@@ -120,19 +119,18 @@
 //   D0* = GPIO1  (BCLK)    5V
 //   D1* = GPIO2  (LRC)     GND*
 //   D2* = GPIO3  (DOUT)    3V3*
-//   D3* = GPIO4  (ENC_CLK) D10* = GPIO9  (LED_R)
-//   D4* = GPIO5  (ENC_DT)  D9*  = GPIO8  (LED_G)
-//   D5* = GPIO6  (ENC_SW)  D8*  = GPIO7  (LED_B)
-//   D6  = GPIO43 (free)    D7   = GPIO44 (free)
+//   D3* = GPIO4  (ENC_CLK) D10  = GPIO9  (free)
+//   D4* = GPIO5  (ENC_DT)  D9   = GPIO8  (free)
+//   D5* = GPIO6  (ENC_SW)  D8   = GPIO7  (free)
+//   D6* = GPIO43 (LED_G)   D7*  = GPIO44 (LED_B)
 
-// RGB LED (accent feedback during playback)
+// Dual-color LED (accent feedback during playback)
 // Connect each pin through a 220-470Ω resistor to the LED
-// Common cathode: connect LED common to GND, set RGB_ACTIVE_LOW = false
-// Common anode: connect LED common to 3V3, set RGB_ACTIVE_LOW = true
-#define RGB_ACTIVE_LOW      false
-#define PIN_LED_RED         9     // D10: Red channel
-#define PIN_LED_GREEN       8     // D9:  Green channel
-#define PIN_LED_BLUE        7     // D8:  Blue channel
+// Common cathode: connect LED common to GND, set LED_ACTIVE_LOW = false
+// Common anode: connect LED common to 3V3, set LED_ACTIVE_LOW = true
+#define LED_ACTIVE_LOW      false
+#define PIN_LED_GREEN       43    // D6: Green channel
+#define PIN_LED_BLUE        44    // D7: Blue channel
 
 // I2S Audio (digital audio to MAX98357A DAC/Amplifier)
 // These carry the digital audio signal - amp converts to analog for speaker
@@ -189,20 +187,20 @@ static const char* const TRACK_FILES[NUM_TRACKS] = {
 };
 
 static const char* const TRACK_COLOR_NAMES[NUM_TRACKS] = {
-  "Red", "Orange", "Yellow", "Green", "Cyan",
-  "Blue", "Purple", "Pink", "White"
+  "Green", "Blue", "Cyan", "Mint", "Azure",
+  "Teal", "Sea", "Sky", "White"
 };
 
-static const uint8_t TRACK_COLORS[NUM_TRACKS][3] = {
-  {255,   0,   0},  // 1: Red
-  {255, 127,   0},  // 2: Orange
-  {255, 255,   0},  // 3: Yellow
-  {  0, 255,   0},  // 4: Green
-  {  0, 255, 255},  // 5: Cyan
-  {  0,   0, 255},  // 6: Blue
-  {127,   0, 255},  // 7: Purple
-  {255,   0, 127},  // 8: Pink
-  {255, 255, 255}   // 9: White
+static const uint8_t TRACK_COLORS[NUM_TRACKS][2] = {
+  {255,   0},  // 1: Green
+  {  0, 255},  // 2: Blue
+  {180, 180},  // 3: Cyan
+  {220, 100},  // 4: Mint
+  { 80, 220},  // 5: Azure
+  {200, 140},  // 6: Teal
+  {150, 200},  // 7: Sea
+  {120, 220},  // 8: Sky
+  {255, 255}   // 9: White
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -228,7 +226,6 @@ static bool          g_swPressed    = false;
 static bool          g_swHandled    = false;
 
 static float         g_breathPhase       = 0.0f;
-static uint16_t      g_rainbowHue        = 0;
 static unsigned long g_lastAnimTime      = 0;
 static unsigned long g_trackColorStart   = 0;
 static bool          g_showingTrackColor = false;
@@ -313,11 +310,11 @@ static void printWelcome() {
   Serial.println(F("│    Long press ────> Next Track                            │"));
   Serial.println(F("│                                                           │"));
   Serial.println(F("│  WIRING CHECK:                                            │"));
-  Serial.println(F("│    D0/GPIO1 -> BCLK    D8/GPIO7 -> Blue LED               │"));
-  Serial.println(F("│    D1/GPIO2 -> LRC     D9/GPIO8 -> Green LED              │"));
-  Serial.println(F("│    D2/GPIO3 -> DIN     D10/GPIO9-> Red LED                │"));
-  Serial.println(F("│    D3/GPIO4 -> CLK     3V3 -> Encoder VCC, Amp VIN        │"));
-  Serial.println(F("│    D4/GPIO5 -> DT      GND -> All grounds                 │"));
+  Serial.println(F("│    D0/GPIO1 -> BCLK    D6/GPIO43 -> Green LED             │"));
+  Serial.println(F("│    D1/GPIO2 -> LRC     D7/GPIO44 -> Blue LED              │"));
+  Serial.println(F("│    D2/GPIO3 -> DIN     3V3 -> Encoder VCC, Amp VIN        │"));
+  Serial.println(F("│    D3/GPIO4 -> CLK     GND -> All grounds                 │"));
+  Serial.println(F("│    D4/GPIO5 -> DT                                         │"));
   Serial.println(F("│    D5/GPIO6 -> SW                                         │"));
   Serial.println(F("│                                                           │"));
   Serial.println(F("│  Press encoder to start...                                │"));
@@ -341,44 +338,25 @@ static void printSuccess(const char* msg) {
 // LED CONTROL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-static void setLED(uint8_t r, uint8_t g, uint8_t b) {
-  if (RGB_ACTIVE_LOW) {
-    ledcWrite(PIN_LED_RED, 255 - r);
+static void setLED(uint8_t g, uint8_t b) {
+  if (LED_ACTIVE_LOW) {
     ledcWrite(PIN_LED_GREEN, 255 - g);
     ledcWrite(PIN_LED_BLUE, 255 - b);
   } else {
-    ledcWrite(PIN_LED_RED, r);
     ledcWrite(PIN_LED_GREEN, g);
     ledcWrite(PIN_LED_BLUE, b);
   }
 }
 
-static void hsvToRgb(uint16_t h, uint8_t s, uint8_t v, uint8_t* r, uint8_t* g, uint8_t* b) {
-  if (s == 0) { *r = *g = *b = v; return; }
-  uint8_t region = h / 60;
-  uint8_t rem = (h - (region * 60)) * 255 / 60;
-  uint8_t p = (v * (255 - s)) >> 8;
-  uint8_t q = (v * (255 - ((s * rem) >> 8))) >> 8;
-  uint8_t t = (v * (255 - ((s * (255 - rem)) >> 8))) >> 8;
-  switch (region) {
-    case 0:  *r = v; *g = t; *b = p; break;
-    case 1:  *r = q; *g = v; *b = p; break;
-    case 2:  *r = p; *g = v; *b = t; break;
-    case 3:  *r = p; *g = q; *b = v; break;
-    case 4:  *r = t; *g = p; *b = v; break;
-    default: *r = v; *g = p; *b = q; break;
-  }
-}
-
 static void showTrackColor(int idx) {
   if (idx < 0 || idx >= NUM_TRACKS) return;
-  setLED(TRACK_COLORS[idx][0], TRACK_COLORS[idx][1], TRACK_COLORS[idx][2]);
+  setLED(TRACK_COLORS[idx][0], TRACK_COLORS[idx][1]);
   g_showingTrackColor = true;
   g_trackColorStart = millis();
 }
 
 static void showVolumeFlash() {
-  setLED(100, 100, 100);
+  setLED(120, 120);
   g_showingVolFlash = true;
   g_volFlashStart = millis();
 }
@@ -388,10 +366,9 @@ static void breathingRainbow() {
   if (g_breathPhase > TWO_PI) g_breathPhase -= TWO_PI;
   float breathVal = (sinf(g_breathPhase) + 1.0f) / 2.0f;
   uint8_t brightness = BREATH_MIN + (uint8_t)(breathVal * (BREATH_MAX - BREATH_MIN));
-  g_rainbowHue = (g_rainbowHue + 1) % 360;
-  uint8_t r, g, b;
-  hsvToRgb(g_rainbowHue, 255, brightness, &r, &g, &b);
-  setLED(r, g, b);
+  uint8_t green = (uint8_t)(brightness * 0.75f);
+  uint8_t blue = brightness;
+  setLED(green, blue);
 }
 
 static void updateLED() {
@@ -418,13 +395,13 @@ static void updateLED() {
       break;
     case STATE_PAUSED:
     case STATE_IDLE:
-      setLED(0, 0, 30);
+      setLED(0, 30);
       break;
     case STATE_ERROR: {
       g_breathPhase += 0.1f;
       if (g_breathPhase > TWO_PI) g_breathPhase -= TWO_PI;
       uint8_t br = 50 + (uint8_t)((sinf(g_breathPhase) + 1.0f) * 100.0f);
-      setLED(br, 0, 0);
+      setLED(br, 0);
       break;
     }
   }
@@ -436,7 +413,7 @@ static void updateLED() {
 
 static void enterSleep() {
   g_sleeping = true;
-  setLED(0, 0, 0);
+  setLED(0, 0);
   Serial.println();
   printStatus("zzz", "Entering sleep... (press/rotate to wake)");
   Serial.println();
@@ -535,7 +512,7 @@ static void playTrack(int idx) {
     if (tries >= NUM_TRACKS) {
       printError("No tracks found!");
       g_state = STATE_ERROR;
-      setLED(255, 0, 0);
+      setLED(255, 0);
       return;
     }
     showTrackColor(g_track);
@@ -549,7 +526,7 @@ static void playTrack(int idx) {
   } else {
     printError("Playback failed!");
     g_state = STATE_ERROR;
-    setLED(255, 0, 0);
+    setLED(255, 0);
   }
 }
 
@@ -657,7 +634,6 @@ void setup() {
   printStatus("INIT", "Starting...");
   
   // GPIO
-  pinMode(PIN_LED_RED, OUTPUT);
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_BLUE, OUTPUT);
   pinMode(PIN_ENC_CLK, INPUT_PULLUP);
@@ -667,10 +643,9 @@ void setup() {
   printSuccess("GPIO ready");
   
   // LED PWM
-  ledcAttach(PIN_LED_RED, LED_PWM_FREQ, LED_PWM_BITS);
   ledcAttach(PIN_LED_GREEN, LED_PWM_FREQ, LED_PWM_BITS);
   ledcAttach(PIN_LED_BLUE, LED_PWM_FREQ, LED_PWM_BITS);
-  setLED(128, 0, 128);
+  setLED(128, 128);
   printSuccess("LED ready");
   
   // SD & Audio
@@ -686,7 +661,7 @@ void setup() {
     enterSleep();
   } else {
     g_state = STATE_ERROR;
-    setLED(255, 0, 0);
+    setLED(255, 0);
   }
 }
 
@@ -713,7 +688,7 @@ void audio_eof_mp3(const char* info) {
 
 void audio_id3data(const char* info)  { printStatusF("ID3", "%s", info); }
 void audio_info(const char* info)     { /* Filtered - too verbose */ }
-void audio_error(const char* info)    { printStatusF("ERR", "%s", info); g_state = STATE_ERROR; setLED(255,0,0); }
+void audio_error(const char* info)    { printStatusF("ERR", "%s", info); g_state = STATE_ERROR; setLED(255,0); }
 void audio_bitrate(const char* info)  { printStatusF("RATE", "%s", info); }
 
 void audio_commercial(const char* i)      { (void)i; }

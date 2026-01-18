@@ -10,7 +10,7 @@ A magical little music box with organic LED breathing effects, built for the See
 
 - **9-track SD card playback** — Plays MP3 files from microSD card
 - **Rotary encoder control** — Intuitive volume and playback control
-- **Organic LED effects** — Breathing rainbow glow while playing
+- **Organic LED effects** — Breathing green/blue glow while playing
 - **Track color identity** — Each track has a unique color for easy recognition
 - **Low-power sleep** — LED off and minimal power draw when paused
 - **Resume playback** — Wakes and continues from where you left off
@@ -30,18 +30,18 @@ A magical little music box with organic LED breathing effects, built for the See
 
 | State | LED Behavior |
 |-------|--------------|
-| Playing | Breathing rainbow glow |
+| Playing | Breathing green/blue glow |
 | Track change | Solid color for 1.5 seconds |
 | Paused / Sleep | LED off |
-| Error | Pulsing red |
+| Error | Pulsing green |
 
 ### Track Colors
 
 | Track | Color | Track | Color | Track | Color |
 |-------|-------|-------|-------|-------|-------|
-| 1 | 🔴 Red | 4 | 🟢 Green | 7 | 🟣 Purple |
-| 2 | 🟠 Orange | 5 | 🩵 Cyan | 8 | 💗 Pink |
-| 3 | 🟡 Yellow | 6 | 🔵 Blue | 9 | ⚪ White |
+| 1 | 🟢 Green | 4 | 🌿 Mint | 7 | 🌊 Sea |
+| 2 | 🔵 Blue | 5 | 🔹 Azure | 8 | 🌌 Sky |
+| 3 | 🩵 Cyan | 6 | 🧊 Teal | 9 | ⚪ White |
 
 ## 🔧 Hardware Requirements
 
@@ -51,8 +51,8 @@ A magical little music box with organic LED breathing effects, built for the See
 | MAX98357A | I2S DAC/Amplifier breakout |
 | Speaker | 4Ω or 8Ω, 2-3W recommended |
 | Rotary Encoder | KY-040 style with push button |
-| RGB LED | Common cathode or common anode |
-| Resistors | 3× 220Ω-470Ω for LED current limiting |
+| Dual-color LED | Green + Blue LED, common cathode or common anode |
+| Resistors | 2× 220Ω-470Ω for LED current limiting |
 | MicroSD Card | FAT32 formatted |
 
 ## 📌 Wiring
@@ -68,9 +68,8 @@ D2  (GPIO3)  ───────────────> MAX98357A DIN
 D3  (GPIO4)  ───────────────> Encoder CLK
 D4  (GPIO5)  ───────────────> Encoder DT
 D5  (GPIO6)  ───────────────> Encoder SW
-D8  (GPIO7)  ──[220Ω]───────> RGB LED Blue
-D9  (GPIO8)  ──[220Ω]───────> RGB LED Green
-D10 (GPIO9)  ──[220Ω]───────> RGB LED Red
+D6  (GPIO43) ──[220Ω]───────> LED Green
+D7  (GPIO44) ──[220Ω]───────> LED Blue
 3V3          ───────────────> Encoder VCC, MAX98357A VIN
 GND          ───────────────> All grounds, LED common (cathode)
 ```
@@ -127,14 +126,13 @@ The encoder provides **two functions**: rotation for volume control, and a built
 
 **Push Button** (SW): Press down on the encoder knob. Short press = play/pause, long press = next track.
 
-### RGB LED
+### Dual-color LED
 
 | Pin | Connect To | Notes |
 |-----|------------|-------|
-| Red | D10 (GPIO9) via 220Ω resistor | Current limiting required! |
-| Green | D9 (GPIO8) via 220Ω resistor | 220-470Ω is fine |
-| Blue | D8 (GPIO7) via 220Ω resistor | Lower = brighter |
-| Common | GND (cathode) or 3V3 (anode) | Set `RGB_ACTIVE_LOW` in code |
+| Green | D6 (GPIO43) via 220Ω resistor | 220-470Ω is fine |
+| Blue | D7 (GPIO44) via 220Ω resistor | Lower = brighter |
+| Common | GND (cathode) or 3V3 (anode) | Set `LED_ACTIVE_LOW` in code |
 
 ### Pinout Reference
 
@@ -219,7 +217,7 @@ Connect at **115200 baud** to see formatted debug output:
 ────────────────────────────────────────────────────────────
 [00:05.200] NOW  Playing Track 3 of 9
 [00:05.201]      File:  /03.mp3
-[00:05.202]      Color: Yellow
+[00:05.202]      Color: Cyan
 ────────────────────────────────────────────────────────────
 
 [00:10.500] VOL  Volume: [===============------] 15/21
@@ -239,15 +237,15 @@ Key settings can be adjusted at the top of the sketch:
 
 // LED Animation
 #define BREATH_SPEED        2     // Breathing animation speed
-#define RAINBOW_INTERVAL_MS 50    // Rainbow color cycle speed
+#define RAINBOW_INTERVAL_MS 50    // LED animation update rate
 ```
 
 ### Common Anode LED
 
-If using a common anode RGB LED, change this line:
+If using a common anode LED, change this line:
 
 ```cpp
-#define RGB_ACTIVE_LOW      true   // Set to true for common anode
+#define LED_ACTIVE_LOW      true   // Set to true for common anode
 ```
 
 ## 🐛 Troubleshooting
