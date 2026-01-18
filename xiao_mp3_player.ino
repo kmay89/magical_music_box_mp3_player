@@ -4,7 +4,7 @@
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  * 
  * @file      xiao_mp3_player.ino
- * @brief     SD card MP3 player with rotary encoder and dual-color LED feedback
+ * @brief     SD card MP3 player with rotary encoder and RGB LED feedback
  * @version   1.0.2
  * @date      2025-01-17
  * @hardware  Seeed Studio XIAO ESP32S3 Sense
@@ -34,9 +34,10 @@
  *   D3         4      Encoder CLK           Rotary Encoder CLK (rotation pulse)
  *   D4         5      Encoder DT            Rotary Encoder DT (rotation direction)
  *   D5         6      Encoder SW            Rotary Encoder SW (push button)
- *   D6         43     LED Green             LED Green + 220Ω resistor
+ *   D6         43     LED Red               LED Red + 220Ω resistor
  *   D7         44     LED Blue              LED Blue + 220Ω resistor
- *   -          41     Servo Control         Continuous rotation servo signal
+ *   D11        41     LED Green             LED Green + 220Ω resistor
+ *   D12        42     Servo Control         Continuous rotation servo signal
  *   3V3        -      3.3V Power            Encoder +/VCC, MAX98357A VIN
  *   GND        -      Ground                All grounds, LED cathode
  * 
@@ -126,15 +127,16 @@
 //   D3* = GPIO4  (ENC_CLK) D10  = GPIO9  (free)
 //   D4* = GPIO5  (ENC_DT)  D9   = GPIO8  (free)
 //   D5* = GPIO6  (ENC_SW)  D8   = GPIO7  (free)
-//   D6* = GPIO43 (LED_G)   D7*  = GPIO44 (LED_B)
-//   (Use GPIO41 for the servo signal)
+//   D6* = GPIO43 (LED_R)   D7*  = GPIO44 (LED_B)
+//   D11 = GPIO41 (LED_G)   D12  = GPIO42 (SERVO)
 
-// Dual-color LED (accent feedback during playback)
+// RGB LED (accent feedback during playback)
 // Connect each pin through a 220-470Ω resistor to the LED
 // Common cathode: connect LED common to GND, set LED_ACTIVE_LOW = false
 // Common anode: connect LED common to 3V3, set LED_ACTIVE_LOW = true
 #define LED_ACTIVE_LOW      false
-#define PIN_LED_GREEN       43    // D6: Green channel
+#define PIN_LED_RED         43    // D6: Red channel
+#define PIN_LED_GREEN       41    // D11: Green channel
 #define PIN_LED_BLUE        44    // D7: Blue channel
 
 // I2S Audio (digital audio to MAX98357A DAC/Amplifier)
@@ -154,7 +156,7 @@
 #define PIN_SD_CS           21    // Internal to expansion board
 
 // Servo (continuous rotation, "record player" spin effect)
-#define PIN_SERVO_CTRL      41    // GPIO41: Servo PWM signal
+#define PIN_SERVO_CTRL      42    // GPIO42: Servo PWM signal
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -207,16 +209,16 @@ static const char* const TRACK_COLOR_NAMES[NUM_TRACKS] = {
   "Teal", "Sea", "Sky", "White"
 };
 
-static const uint8_t TRACK_COLORS[NUM_TRACKS][2] = {
-  {255,   0},  // 1: Green
-  {  0, 255},  // 2: Blue
-  {180, 180},  // 3: Cyan
-  {220, 100},  // 4: Mint
-  { 80, 220},  // 5: Azure
-  {200, 140},  // 6: Teal
-  {150, 200},  // 7: Sea
-  {120, 220},  // 8: Sky
-  {255, 255}   // 9: White
+static const uint8_t TRACK_COLORS[NUM_TRACKS][3] = {
+  {  0, 255,   0},  // 1: Green
+  {  0,   0, 255},  // 2: Blue
+  {  0, 255, 255},  // 3: Cyan
+  { 80, 255, 200},  // 4: Mint
+  {  0, 140, 255},  // 5: Azure
+  {  0, 200, 160},  // 6: Teal
+  {  0, 170, 220},  // 7: Sea
+  { 60, 190, 255},  // 8: Sky
+  {255, 255, 255}   // 9: White
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -416,13 +418,13 @@ static void printWelcome() {
   Serial.println(F("│    Long press ────> Next Track                            │"));
   Serial.println(F("│                                                           │"));
   Serial.println(F("│  WIRING CHECK:                                            │"));
-  Serial.println(F("│    D0/GPIO1 -> BCLK    D6/GPIO43 -> Green LED             │"));
+  Serial.println(F("│    D0/GPIO1 -> BCLK    D6/GPIO43 -> Red LED               │"));
   Serial.println(F("│    D1/GPIO2 -> LRC     D7/GPIO44 -> Blue LED              │"));
   Serial.println(F("│    D2/GPIO3 -> DIN     3V3 -> Encoder VCC, Amp VIN        │"));
   Serial.println(F("│    D3/GPIO4 -> CLK     GND -> All grounds                 │"));
   Serial.println(F("│    D4/GPIO5 -> DT                                         │"));
-  Serial.println(F("│    D5/GPIO6 -> SW                                         │"));
-  Serial.println(F("│    GPIO41 -> Servo signal (continuous rotation)           │"));
+  Serial.println(F("│    D5/GPIO6 -> SW     D11/GPIO41 -> Green LED             │"));
+  Serial.println(F("│    D12/GPIO42 -> Servo signal (continuous rotation)       │"));
   Serial.println(F("│    SD -> FLOAT/VIN (GND = mute)                           │"));
   Serial.println(F("│    GAIN -> optional (NC/GND/VIN for boost)                │"));
   Serial.println(F("│                                                           │"));
@@ -451,11 +453,13 @@ static void printSuccess(const char* msg) {
 // LED CONTROL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-static void setLED(uint8_t g, uint8_t b) {
+static void setLED(uint8_t r, uint8_t g, uint8_t b) {
   if (LED_ACTIVE_LOW) {
+    ledcWrite(PIN_LED_RED, 255 - r);
     ledcWrite(PIN_LED_GREEN, 255 - g);
     ledcWrite(PIN_LED_BLUE, 255 - b);
   } else {
+    ledcWrite(PIN_LED_RED, r);
     ledcWrite(PIN_LED_GREEN, g);
     ledcWrite(PIN_LED_BLUE, b);
   }
@@ -463,13 +467,13 @@ static void setLED(uint8_t g, uint8_t b) {
 
 static void showTrackColor(int idx) {
   if (idx < 0 || idx >= NUM_TRACKS) return;
-  setLED(TRACK_COLORS[idx][0], TRACK_COLORS[idx][1]);
+  setLED(TRACK_COLORS[idx][0], TRACK_COLORS[idx][1], TRACK_COLORS[idx][2]);
   g_showingTrackColor = true;
   g_trackColorStart = millis();
 }
 
 static void showVolumeFlash() {
-  setLED(120, 120);
+  setLED(120, 120, 120);
   g_showingVolFlash = true;
   g_volFlashStart = millis();
 }
@@ -481,7 +485,7 @@ static void breathingRainbow() {
   uint8_t brightness = BREATH_MIN + (uint8_t)(breathVal * (BREATH_MAX - BREATH_MIN));
   uint8_t green = (uint8_t)(brightness * 0.75f);
   uint8_t blue = brightness;
-  setLED(green, blue);
+  setLED(0, green, blue);
 }
 
 static void updateLED() {
@@ -508,13 +512,13 @@ static void updateLED() {
       break;
     case STATE_PAUSED:
     case STATE_IDLE:
-      setLED(0, 30);
+      setLED(0, 0, 30);
       break;
     case STATE_ERROR: {
       g_breathPhase += 0.1f;
       if (g_breathPhase > TWO_PI) g_breathPhase -= TWO_PI;
       uint8_t br = 50 + (uint8_t)((sinf(g_breathPhase) + 1.0f) * 100.0f);
-      setLED(br, 0);
+      setLED(0, br, 0);
       break;
     }
   }
@@ -526,7 +530,7 @@ static void updateLED() {
 
 static void enterSleep() {
   g_sleeping = true;
-  setLED(0, 0);
+  setLED(0, 0, 0);
   if (g_servoArmed) {
     printStatus("SERVO", "Sleep entered: servo disarmed");
   }
@@ -689,7 +693,7 @@ static void playTrack(int idx) {
     if (tries >= NUM_TRACKS) {
       printError("No tracks found!");
       g_state = STATE_ERROR;
-      setLED(255, 0);
+      setLED(0, 255, 0);
       return;
     }
     showTrackColor(g_track);
@@ -703,7 +707,7 @@ static void playTrack(int idx) {
   } else {
     printError("Playback failed!");
     g_state = STATE_ERROR;
-    setLED(255, 0);
+      setLED(0, 255, 0);
   }
 }
 
@@ -809,6 +813,7 @@ void setup() {
   printStatus("INIT", "Starting...");
   
   // GPIO
+  pinMode(PIN_LED_RED, OUTPUT);
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_BLUE, OUTPUT);
   pinMode(PIN_ENC_CLK, INPUT_PULLUP);
@@ -818,9 +823,10 @@ void setup() {
   printSuccess("GPIO ready");
   
   // LED PWM
+  ledcAttach(PIN_LED_RED, LED_PWM_FREQ, LED_PWM_BITS);
   ledcAttach(PIN_LED_GREEN, LED_PWM_FREQ, LED_PWM_BITS);
   ledcAttach(PIN_LED_BLUE, LED_PWM_FREQ, LED_PWM_BITS);
-  setLED(128, 128);
+  setLED(128, 128, 128);
   printSuccess("LED ready");
 
   // Servo PWM
@@ -842,7 +848,7 @@ void setup() {
     enterSleep();
   } else {
     g_state = STATE_ERROR;
-    setLED(255, 0);
+    setLED(0, 255, 0);
   }
 }
 
@@ -870,7 +876,7 @@ void audio_eof_mp3(const char* info) {
 
 void audio_id3data(const char* info)  { printStatusF("ID3", "%s", info); }
 void audio_info(const char* info)     { /* Filtered - too verbose */ }
-void audio_error(const char* info)    { printStatusF("ERR", "%s", info); g_state = STATE_ERROR; setLED(255,0); }
+void audio_error(const char* info)    { printStatusF("ERR", "%s", info); g_state = STATE_ERROR; setLED(0,255,0); }
 void audio_bitrate(const char* info)  { printStatusF("RATE", "%s", info); }
 
 void audio_commercial(const char* i)      { (void)i; }
