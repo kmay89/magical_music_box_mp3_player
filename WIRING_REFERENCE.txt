@@ -191,6 +191,23 @@
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
+│  SENSE EXPANSION BOARD EXTRA PINS (D11/D12)                                   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   The Sense expansion board exposes two extra pins:
+
+     • D11 = GPIO41
+     • D12 = GPIO42
+
+   These are wired to the onboard microphone by default. To reuse them for
+   a servo PWM pin or an RGB LED channel, flip the board and cut the J1–J2
+   trace along the white line between the two pads. Once cut, GPIO41/GPIO42
+   can be used normally without interfering with the SD card SPI lines.
+
+   Note: On ESP32-S3, GPIO41/GPIO42 do NOT support ADC.
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
 │  CONTROLS                                                                     │
 └───────────────────────────────────────────────────────────────────────────────┘
 

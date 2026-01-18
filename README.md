@@ -155,6 +155,10 @@ The encoder provides **two functions**: rotation for volume control, and a built
         └─────────────────────────────┘
 ```
 
+### Sense Expansion Board (D11/D12)
+
+The Sense expansion board exposes two extra pins: **D11 (GPIO41)** and **D12 (GPIO42)**. By default they are connected to the onboard microphone. To repurpose them (for example, a servo PWM pin and an RGB channel), you must cut the **J1–J2** trace on the back of the expansion board (along the white line between the pads). Once cut, you can use **GPIO41** and **GPIO42** directly without affecting the SD card SPI pins. Note: these pins do **not** support ADC on the ESP32-S3.
+
 ## 💾 SD Card Setup
 
 1. Format microSD card as **FAT32**
