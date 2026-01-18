@@ -55,6 +55,7 @@
    D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (push button)
    D6         │  GPIO43 │  LED Green       │  LED Green + 220Ω resistor
    D7         │  GPIO44 │  LED Blue        │  LED Blue + 220Ω resistor
+   D11        │  GPIO41 │  Servo Signal    │  Continuous rotation servo PWM
    3V3        │  -      │  3.3V Power      │  Encoder VCC, MAX98357A VIN
    GND        │  -      │  Ground          │  All component grounds
    5V         │  -      │  5V Power        │  (optional: MAX98357A for louder)
@@ -208,6 +209,26 @@
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
+│  SERVO (CONTINUOUS ROTATION, OPTIONAL)                                        │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+   The servo is an easter egg and is OFF by default.
+
+   Wiring:
+   ─────────────────────────────────────────────────────────────────────────────
+   • Signal -> D11 (GPIO41) (after cutting the J1–J2 trace)
+   • Power  -> 5V or 3V3 (match your servo spec)
+   • Ground -> GND (shared with the XIAO)
+
+   Behavior:
+   ─────────────────────────────────────────────────────────────────────────────
+   • Hold the encoder button for 5 seconds to ARM the servo.
+   • Servo spins only while playing.
+   • Pauses briefly during track skips/searches.
+   • Entering sleep DISARMS the servo (re-arm after wake).
+
+
+┌───────────────────────────────────────────────────────────────────────────────┐
 │  CONTROLS                                                                     │
 └───────────────────────────────────────────────────────────────────────────────┘
 
@@ -217,6 +238,7 @@
    Rotate counter-clockwise    Volume down
    Short press (<500ms)        Play / Pause (pause = sleep)
    Long press (≥500ms)         Skip to next track
+   Hold press (≥5s)            Enable servo spin easter egg (resets on sleep)
    Any input while sleeping    Wake and resume playback
 
 

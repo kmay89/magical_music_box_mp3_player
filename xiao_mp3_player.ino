@@ -36,6 +36,7 @@
  *   D5         6      Encoder SW            Rotary Encoder SW (push button)
  *   D6         43     LED Green             LED Green + 220Ω resistor
  *   D7         44     LED Blue              LED Blue + 220Ω resistor
+ *   -          41     Servo Control         Continuous rotation servo signal
  *   3V3        -      3.3V Power            Encoder +/VCC, MAX98357A VIN
  *   GND        -      Ground                All grounds, LED cathode
  * 
@@ -124,6 +125,7 @@
 //   D4* = GPIO5  (ENC_DT)  D9   = GPIO8  (free)
 //   D5* = GPIO6  (ENC_SW)  D8   = GPIO7  (free)
 //   D6* = GPIO43 (LED_G)   D7*  = GPIO44 (LED_B)
+//   (Use GPIO41 for the servo signal)
 
 // Dual-color LED (accent feedback during playback)
 // Connect each pin through a 220-470Ω resistor to the LED
@@ -149,6 +151,9 @@
 // SD Card (Sense expansion board - no external wiring)
 #define PIN_SD_CS           21    // Internal to expansion board
 
+// Servo (continuous rotation, "record player" spin effect)
+#define PIN_SERVO_CTRL      41    // GPIO41: Servo PWM signal
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -169,6 +174,8 @@
 #define TRACK_COLOR_MS      1500
 #define VOLUME_FLASH_MS     200
 #define SLEEP_POLL_MS       50
+#define SERVO_ARM_HOLD_MS   5000
+#define SERVO_SKID_PAUSE_MS 200
 
 // LED Animation
 #define LED_PWM_FREQ        5000
@@ -177,6 +184,12 @@
 #define BREATH_MAX          255
 #define BREATH_SPEED        2
 #define RAINBOW_INTERVAL_MS 50
+
+// Servo PWM (continuous rotation)
+#define SERVO_PWM_FREQ      50
+#define SERVO_PWM_BITS      16
+#define SERVO_STOP_US       1500
+#define SERVO_RECORD_US     1620
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRACK DATA
@@ -218,13 +231,16 @@ static int         g_track    = 0;
 static int         g_volume   = VOLUME_DEFAULT;
 static bool        g_sdReady  = false;
 static bool        g_sleeping = false;
+static bool        g_servoArmed = false;
+static bool        g_servoSpinning = false;
+static unsigned long g_servoSkidUntil = 0;
+static int         g_servoMode = 0;
 
 static int           g_encLastCLK  = HIGH;
 static unsigned long g_encLastTime = 0;
 
 static unsigned long g_swPressStart = 0;
 static bool          g_swPressed    = false;
-static bool          g_swHandled    = false;
 
 static float         g_breathPhase       = 0.0f;
 static unsigned long g_lastAnimTime      = 0;
@@ -234,6 +250,78 @@ static unsigned long g_volFlashStart     = 0;
 static bool          g_showingVolFlash   = false;
 
 static unsigned long g_startTime = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SERVO CONTROL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+static uint32_t servoPulseToDuty(uint16_t us) {
+  const uint32_t maxDuty = (1U << SERVO_PWM_BITS) - 1;
+  const uint32_t periodUs = 1000000UL / SERVO_PWM_FREQ;
+  return static_cast<uint32_t>((static_cast<uint64_t>(us) * maxDuty) / periodUs);
+}
+
+static void setServoPulseUs(uint16_t us) {
+  ledcWrite(PIN_SERVO_CTRL, servoPulseToDuty(us));
+}
+
+static void stopServo() {
+  if (!g_servoSpinning) return;
+  setServoPulseUs(SERVO_STOP_US);
+  g_servoSpinning = false;
+}
+
+static void spinServo() {
+  if (g_servoSpinning) return;
+  setServoPulseUs(SERVO_RECORD_US);
+  g_servoSpinning = true;
+}
+
+static void reportServoMode(int mode) {
+  if (mode == g_servoMode) return;
+  g_servoMode = mode;
+  switch (mode) {
+    case 0:
+      printStatus("SERVO", "Disabled (hold button 5s to enable)");
+      break;
+    case 1:
+      printStatus("SERVO", "Paused briefly for track change/search");
+      break;
+    case 2:
+      printStatus("SERVO", "Stopped (not playing)");
+      break;
+    case 3:
+      printStatus("SERVO", "Spinning at record RPM");
+      break;
+  }
+}
+
+static void skidServoPause() {
+  if (!g_servoArmed) return;
+  stopServo();
+  g_servoSkidUntil = millis() + SERVO_SKID_PAUSE_MS;
+}
+
+static void updateServo() {
+  if (!g_servoArmed) {
+    stopServo();
+    reportServoMode(0);
+    return;
+  }
+  unsigned long now = millis();
+  if (now < g_servoSkidUntil) {
+    stopServo();
+    reportServoMode(1);
+    return;
+  }
+  if (g_state == STATE_PLAYING) {
+    spinServo();
+    reportServoMode(3);
+  } else {
+    stopServo();
+    reportServoMode(2);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SERIAL OUTPUT
@@ -317,8 +405,13 @@ static void printWelcome() {
   Serial.println(F("│    D3/GPIO4 -> CLK     GND -> All grounds                 │"));
   Serial.println(F("│    D4/GPIO5 -> DT                                         │"));
   Serial.println(F("│    D5/GPIO6 -> SW                                         │"));
+  Serial.println(F("│    GPIO41 -> Servo signal (continuous rotation)           │"));
   Serial.println(F("│    SD -> FLOAT/VIN (GND = mute)                           │"));
   Serial.println(F("│    GAIN -> optional (NC/GND/VIN for boost)                │"));
+  Serial.println(F("│                                                           │"));
+  Serial.println(F("│  SERVO EASTER EGG:                                        │"));
+  Serial.println(F("│    Hold button 5s -> Enable record spin                   │"));
+  Serial.println(F("│    Sleep resets servo (default is OFF)                    │"));
   Serial.println(F("│                                                           │"));
   Serial.println(F("│  Press encoder to start...                                │"));
   Serial.println(F("└───────────────────────────────────────────────────────────┘"));
@@ -417,6 +510,13 @@ static void updateLED() {
 static void enterSleep() {
   g_sleeping = true;
   setLED(0, 0);
+  if (g_servoArmed) {
+    printStatus("SERVO", "Sleep entered: servo disarmed");
+  }
+  g_servoArmed = false;
+  g_servoSkidUntil = 0;
+  g_servoMode = 0;
+  stopServo();
   Serial.println();
   printStatus("zzz", "Entering sleep... (press/rotate to wake)");
   Serial.println();
@@ -429,7 +529,6 @@ static void wakeUp() {
   delay(100);
   g_encLastCLK = digitalRead(PIN_ENC_CLK);
   g_swPressed = false;
-  g_swHandled = false;
   
   if (g_state == STATE_PAUSED) {
     audio.pauseResume();
@@ -559,6 +658,7 @@ static void playTrack(int idx) {
   
   if (!fileExists(TRACK_FILES[g_track])) {
     printStatusF("WARN", "Track %d missing, searching...", g_track + 1);
+    skidServoPause();
     int tries = 0;
     while (!fileExists(TRACK_FILES[g_track]) && tries < NUM_TRACKS) {
       g_track = (g_track + 1) % NUM_TRACKS;
@@ -587,6 +687,7 @@ static void playTrack(int idx) {
 
 static void nextTrack() {
   printStatus("SKIP", "Next track...");
+  skidServoPause();
   audio.stopSong();
   playTrack((g_track + 1) % NUM_TRACKS);
 }
@@ -653,26 +754,23 @@ static void handleEncoderSwitch() {
   if (pressed && !g_swPressed) {
     g_swPressStart = now;
     g_swPressed = true;
-    g_swHandled = false;
-  }
-  
-  // Switch being held - check for long press
-  if (pressed && g_swPressed && !g_swHandled) {
-    if (now - g_swPressStart >= LONG_PRESS_MS) {
-      printStatus("ENC", "Long press → Next track");
-      nextTrack();
-      g_swHandled = true;
-    }
   }
   
   // Switch released
   if (!pressed && g_swPressed) {
-    if (!g_swHandled && (now - g_swPressStart) >= DEBOUNCE_BUTTON_MS) {
+    unsigned long heldMs = now - g_swPressStart;
+    if (heldMs >= SERVO_ARM_HOLD_MS) {
+      g_servoArmed = true;
+      g_servoSkidUntil = 0;
+      printStatus("SERVO", "Easter egg enabled: servo armed");
+    } else if (heldMs >= LONG_PRESS_MS) {
+      printStatus("ENC", "Long press → Next track");
+      nextTrack();
+    } else if (heldMs >= DEBOUNCE_BUTTON_MS) {
       printStatus("ENC", "Short press → Play/Pause");
       togglePlayPause();
     }
     g_swPressed = false;
-    g_swHandled = false;
   }
 }
 
@@ -702,6 +800,12 @@ void setup() {
   ledcAttach(PIN_LED_BLUE, LED_PWM_FREQ, LED_PWM_BITS);
   setLED(128, 128);
   printSuccess("LED ready");
+
+  // Servo PWM
+  ledcAttach(PIN_SERVO_CTRL, SERVO_PWM_FREQ, SERVO_PWM_BITS);
+  setServoPulseUs(SERVO_STOP_US);
+  printSuccess("Servo ready");
+  printStatus("SERVO", "Default off (hold button 5s to enable)");
   
   // SD & Audio
   setupSD();
@@ -730,6 +834,7 @@ void loop() {
   handleEncoder();
   handleEncoderSwitch();
   updateLED();
+  updateServo();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

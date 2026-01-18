@@ -15,6 +15,7 @@ A magical little music box with organic LED breathing effects, built for the See
 - **Low-power sleep** — LED off and minimal power draw when paused
 - **Resume playback** — Wakes and continues from where you left off
 - **Beautiful serial output** — Detailed, formatted logging for debugging
+- **Servo record spin (easter egg)** — Optional continuous-rotation spin on GPIO41 while playing
 
 ## 🎮 Controls
 
@@ -24,6 +25,7 @@ A magical little music box with organic LED breathing effects, built for the See
 | Rotate counter-clockwise | Volume down |
 | Short press (<500ms) | Play / Pause |
 | Long press (≥500ms) | Skip to next track |
+| Hold press (≥5s) | Enable servo spin easter egg (resets on sleep) |
 | Any interaction while sleeping | Wake and resume |
 
 ## 🌈 LED Feedback
@@ -54,6 +56,7 @@ A magical little music box with organic LED breathing effects, built for the See
 | Dual-color LED | Green + Blue LED, common cathode or common anode |
 | Resistors | 2× 220Ω-470Ω for LED current limiting |
 | MicroSD Card | FAT32 formatted |
+| Continuous-rotation servo | Optional record-style spin effect (GPIO41) |
 
 ## 📌 Wiring
 
@@ -70,6 +73,7 @@ D4  (GPIO5)  ───────────────> Encoder DT
 D5  (GPIO6)  ───────────────> Encoder SW
 D6  (GPIO43) ──[220Ω]───────> LED Green
 D7  (GPIO44) ──[220Ω]───────> LED Blue
+D11 (GPIO41) ──────────────> Servo signal (continuous rotation)
 3V3          ───────────────> Encoder VCC, MAX98357A VIN
 GND          ───────────────> All grounds, LED common (cathode)
 ```
@@ -135,6 +139,16 @@ The encoder provides **two functions**: rotation for volume control, and a built
 | Green | D6 (GPIO43) via 220Ω resistor | 220-470Ω is fine |
 | Blue | D7 (GPIO44) via 220Ω resistor | Lower = brighter |
 | Common | GND (cathode) or 3V3 (anode) | Set `LED_ACTIVE_LOW` in code |
+
+### Servo (Continuous Rotation, Optional)
+
+The servo is an easter egg: it is **off by default** and only spins when armed.
+
+- Wire the servo signal to **D11 (GPIO41)** on the Sense expansion board (after cutting the J1–J2 trace).
+- Hold the encoder button for **5 seconds** to arm the servo.
+- The servo spins only while a track is **playing**.
+- It pauses briefly during track changes/searches, then resumes.
+- Entering sleep **disarms** the servo (you must re-arm it after wake).
 
 ### Pinout Reference
 
@@ -240,6 +254,8 @@ Key settings can be adjusted at the top of the sketch:
 // Timing
 #define LONG_PRESS_MS       500   // Long press threshold
 #define TRACK_COLOR_MS      1500  // Track color display duration
+#define SERVO_ARM_HOLD_MS   5000  // Hold to enable servo easter egg
+#define SERVO_RECORD_US     1620  // Servo pulse for record RPM (tune as needed)
 
 // LED Animation
 #define BREATH_SPEED        2     // Breathing animation speed
