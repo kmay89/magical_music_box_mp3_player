@@ -100,6 +100,7 @@
 #include <Audio.h>
 #include <SD.h>
 #include <FS.h>
+#include <SPI.h>
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSION
@@ -443,6 +444,43 @@ static void wakeUp() {
 // SD CARD
 // ═══════════════════════════════════════════════════════════════════════════════
 
+static void listDir(fs::FS &fs, const char* dirname, uint8_t levels) {
+  File root = fs.open(dirname);
+  if (!root) {
+    printError("Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    printError("Not a directory");
+    root.close();
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      printTimestamp();
+      Serial.printf("DIR  %s\n", file.name());
+      if (levels) {
+        listDir(fs, file.path(), levels - 1);
+      }
+    } else {
+      printTimestamp();
+      Serial.printf("FILE %s  (%u bytes)\n", file.name(), (unsigned)file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
+static void printSDSummary() {
+  printTimestamp();
+  Serial.printf("SD   Total: %llu MB, Used: %llu MB\n",
+                SD.totalBytes() / (1024 * 1024),
+                SD.usedBytes() / (1024 * 1024));
+  printStatus("SD", "Listing root directory");
+  listDir(SD, "/", 1);
+}
+
 static bool fileExists(const char* path) {
   File f = SD.open(path);
   if (f) { bool ok = !f.isDirectory(); f.close(); return ok; }
@@ -452,9 +490,14 @@ static bool fileExists(const char* path) {
 static void setupSD() {
   printStatus("SD", "Initializing...");
   if (!SD.begin(PIN_SD_CS)) {
-    printError("SD mount failed! Check: inserted? FAT32?");
-    g_sdReady = false;
-    return;
+    printError("SD mount failed! Retrying with slower SPI...");
+    SPI.begin();
+    if (!SD.begin(PIN_SD_CS, SPI, 8000000)) {
+      printError("SD mount failed! Check: inserted? FAT32? Board setting?");
+      printStatus("SD", "Tip: use XIAO ESP32S3 Sense + FAT32, re-seat board.");
+      g_sdReady = false;
+      return;
+    }
   }
   uint8_t type = SD.cardType();
   if (type == CARD_NONE) {
@@ -467,6 +510,7 @@ static void setupSD() {
   Serial.printf("SD   Card: %s, %llu MB\n", typeStr, SD.cardSize() / (1024 * 1024));
   g_sdReady = true;
   printSuccess("SD ready");
+  printSDSummary();
 }
 
 static void scanTracks() {
