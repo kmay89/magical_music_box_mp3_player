@@ -78,6 +78,9 @@
    OPTIONAL PINS:
    ─────────────────────────────────────────────────────────────────────────────
 
+   Reminder: SD must be floating or tied to VIN (GND = mute).
+             GAIN is optional (NC/GND/VIN for boost).
+
    GAIN PIN — Sets FIXED amplifier boost (NOT volume control!)
    ─────────────────────────────────────────────────────────────────────────────
    The GAIN pin sets how much the amplifier boosts the signal AFTER the 

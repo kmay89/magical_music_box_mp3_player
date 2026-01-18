@@ -86,6 +86,8 @@ GND          ───────────────> All grounds, LED com
 | **GAIN** | ❌ Optional | See below | Sets amplifier gain (NOT volume control!). |
 | **SD** | ❌ Optional | See below | Shutdown pin — enables/disables amp. |
 
+Reminder: **SD must be floating or tied to VIN** (GND = mute), and **GAIN is optional** (NC/GND/VIN for boost).
+
 #### GAIN Pin (Amplifier Boost Level)
 
 The GAIN pin sets a **fixed hardware amplification level**. This is NOT the same as volume control!
