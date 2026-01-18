@@ -207,20 +207,20 @@ static const char* const TRACK_FILES[NUM_TRACKS] = {
 };
 
 static const char* const TRACK_COLOR_NAMES[NUM_TRACKS] = {
-  "Green", "Blue", "Cyan", "Mint", "Azure",
-  "Teal", "Sea", "Sky", "White"
+  "Red", "Orange", "Yellow", "Green", "Cyan",
+  "Blue", "Indigo", "Violet", "Magenta"
 };
 
 static const uint8_t TRACK_COLORS[NUM_TRACKS][3] = {
-  {  0, 255,   0},  // 1: Green
-  {  0,   0, 255},  // 2: Blue
-  {  0, 255, 255},  // 3: Cyan
-  { 80, 255, 200},  // 4: Mint
-  {  0, 140, 255},  // 5: Azure
-  {  0, 200, 160},  // 6: Teal
-  {  0, 170, 220},  // 7: Sea
-  { 60, 190, 255},  // 8: Sky
-  {255, 255, 255}   // 9: White
+  {255,   0,   0},  // 1: Red
+  {255, 127,   0},  // 2: Orange
+  {255, 255,   0},  // 3: Yellow
+  {  0, 255,   0},  // 4: Green
+  {  0, 255, 255},  // 5: Cyan
+  {  0,   0, 255},  // 6: Blue
+  { 75,   0, 130},  // 7: Indigo
+  {148,   0, 211},  // 8: Violet
+  {255,   0, 255}   // 9: Magenta
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
