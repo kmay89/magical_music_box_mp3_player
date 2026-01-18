@@ -15,7 +15,7 @@ A magical little music box with organic LED breathing effects, built for the See
 - **Low-power sleep** — LED off and minimal power draw when paused
 - **Resume playback** — Wakes and continues from where you left off
 - **Beautiful serial output** — Detailed, formatted logging for debugging
-- **Servo record spin (easter egg)** — Optional continuous-rotation spin on GPIO41 while playing
+- **Servo record spin (easter egg)** — Optional continuous-rotation spin on GPIO42 while playing
 
 ## 🎮 Controls
 
@@ -53,10 +53,10 @@ A magical little music box with organic LED breathing effects, built for the See
 | MAX98357A | I2S DAC/Amplifier breakout |
 | Speaker | 4Ω or 8Ω, 2-3W recommended |
 | Rotary Encoder | KY-040 style with push button |
-| Dual-color LED | Green + Blue LED, common cathode or common anode |
-| Resistors | 2× 220Ω-470Ω for LED current limiting |
+| RGB LED | Red + Green + Blue LED, common cathode or common anode |
+| Resistors | 3× 220Ω-470Ω for LED current limiting |
 | MicroSD Card | FAT32 formatted |
-| Continuous-rotation servo | Optional record-style spin effect (GPIO41) |
+| Continuous-rotation servo | Optional record-style spin effect (GPIO42) |
 
 ## 📌 Wiring
 
@@ -71,9 +71,10 @@ D2  (GPIO3)  ───────────────> MAX98357A DIN
 D3  (GPIO4)  ───────────────> Encoder CLK
 D4  (GPIO5)  ───────────────> Encoder DT
 D5  (GPIO6)  ───────────────> Encoder SW
-D6  (GPIO43) ──[220Ω]───────> LED Green
+D6  (GPIO43) ──[220Ω]───────> LED Red
 D7  (GPIO44) ──[220Ω]───────> LED Blue
-D11 (GPIO41) ──────────────> Servo signal (continuous rotation)
+D11 (GPIO41) ──[220Ω]───────> LED Green
+D12 (GPIO42) ──────────────> Servo signal (continuous rotation)
 3V3          ───────────────> Encoder VCC, MAX98357A VIN
 GND          ───────────────> All grounds, LED common (cathode)
 ```
@@ -132,11 +133,12 @@ The encoder provides **two functions**: rotation for volume control, and a built
 
 **Push Button** (SW): Press down on the encoder knob. Short press = play/pause, long press = next track.
 
-### Dual-color LED
+### RGB LED
 
 | Pin | Connect To | Notes |
 |-----|------------|-------|
-| Green | D6 (GPIO43) via 220Ω resistor | 220-470Ω is fine |
+| Red | D6 (GPIO43) via 220Ω resistor | 220-470Ω is fine |
+| Green | D11 (GPIO41) via 220Ω resistor | On Sense expansion board |
 | Blue | D7 (GPIO44) via 220Ω resistor | Lower = brighter |
 | Common | GND (cathode) or 3V3 (anode) | Set `LED_ACTIVE_LOW` in code |
 
@@ -144,7 +146,7 @@ The encoder provides **two functions**: rotation for volume control, and a built
 
 The servo is an easter egg: it is **off by default** and only spins when armed.
 
-- Wire the servo signal to **D11 (GPIO41)** on the Sense expansion board (after cutting the J1–J2 trace).
+- Wire the servo signal to **D12 (GPIO42)** on the Sense expansion board (after cutting the J1–J2 trace).
 - Hold the encoder button for **5 seconds** to arm the servo.
 - The servo spins only while a track is **playing**.
 - It pauses briefly during track changes/searches, then resumes.
@@ -171,7 +173,7 @@ The servo is an easter egg: it is **off by default** and only spins when armed.
 
 ### Sense Expansion Board (D11/D12)
 
-The Sense expansion board exposes two extra pins: **D11 (GPIO41)** and **D12 (GPIO42)**. By default they are connected to the onboard microphone. To repurpose them (for example, a servo PWM pin and an RGB channel), you must cut the **J1–J2** trace on the back of the expansion board (along the white line between the pads). Once cut, you can use **GPIO41** and **GPIO42** directly without affecting the SD card SPI pins. Note: these pins do **not** support ADC on the ESP32-S3.
+The Sense expansion board exposes two extra pins: **D11 (GPIO41)** and **D12 (GPIO42)**. By default they are connected to the onboard microphone. To repurpose them (for example, the LED green channel and a servo PWM pin), you must cut the **J1–J2** trace on the back of the expansion board (along the white line between the pads). Once cut, you can use **GPIO41** and **GPIO42** directly without affecting the SD card SPI pins. Note: these pins do **not** support ADC on the ESP32-S3.
 
 ## 💾 SD Card Setup
 

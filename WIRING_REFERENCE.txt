@@ -53,9 +53,10 @@
    D3         │  GPIO4  │  Encoder CLK     │  Rotary Encoder CLK (rotation)
    D4         │  GPIO5  │  Encoder DT      │  Rotary Encoder DT (direction)
    D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (push button)
-   D6         │  GPIO43 │  LED Green       │  LED Green + 220Ω resistor
+   D6         │  GPIO43 │  LED Red         │  LED Red + 220Ω resistor
    D7         │  GPIO44 │  LED Blue        │  LED Blue + 220Ω resistor
-   D11        │  GPIO41 │  Servo Signal    │  Continuous rotation servo PWM
+   D11        │  GPIO41 │  LED Green       │  LED Green + 220Ω resistor
+   D12        │  GPIO42 │  Servo Signal    │  Continuous rotation servo PWM
    3V3        │  -      │  3.3V Power      │  Encoder VCC, MAX98357A VIN
    GND        │  -      │  Ground          │  All component grounds
    5V         │  -      │  5V Power        │  (optional: MAX98357A for louder)
@@ -153,7 +154,7 @@
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  DUAL-COLOR LED                                                               │
+│  RGB LED                                                                      │
 └───────────────────────────────────────────────────────────────────────────────┘
 
    COMMON CATHODE LED (most common - connect common pin to GND):
@@ -162,8 +163,11 @@
                     220Ω
    D6  (GPIO43) ───/\/\/\────┐
                               │   ┌─────┐
-                    220Ω     ├───│ GRN │
-   D7  (GPIO44) ───/\/\/\────┼───│ BLU │──── LED
+                    220Ω     ├───│ RED │
+   D11 (GPIO41) ───/\/\/\────┼───│ GRN │
+                              │   ├─────┤
+                    220Ω     ├───│ BLU │──── LED
+   D7  (GPIO44) ───/\/\/\────┼───│     │
                               │   └─────┘
    GND ──────────────────────┘ (Common Cathode to GND)
 
@@ -201,7 +205,7 @@
      • D12 = GPIO42
 
    These are wired to the onboard microphone by default. To reuse them for
-   a servo PWM pin or an RGB LED channel, flip the board and cut the J1–J2
+   the LED green channel and a servo PWM pin, flip the board and cut the J1–J2
    trace along the white line between the two pads. Once cut, GPIO41/GPIO42
    can be used normally without interfering with the SD card SPI lines.
 
@@ -216,7 +220,7 @@
 
    Wiring:
    ─────────────────────────────────────────────────────────────────────────────
-   • Signal -> D11 (GPIO41) (after cutting the J1–J2 trace)
+   • Signal -> D12 (GPIO42) (after cutting the J1–J2 trace)
    • Power  -> 5V or 3V3 (match your servo spec)
    • Ground -> GND (shared with the XIAO)
 
