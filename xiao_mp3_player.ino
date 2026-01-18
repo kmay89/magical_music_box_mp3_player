@@ -102,6 +102,8 @@
 #include <SD.h>
 #include <FS.h>
 #include <SPI.h>
+#include <type_traits>
+#include <utility>
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSION
@@ -225,6 +227,21 @@ enum PlayerState { STATE_IDLE, STATE_PLAYING, STATE_PAUSED, STATE_ERROR };
 static const char* const STATE_NAMES[] = { "IDLE", "PLAYING", "PAUSED", "ERROR" };
 
 static Audio audio;
+
+template <typename T>
+auto hasSetBufferSize(int) -> decltype(std::declval<T&>().setBufferSize(size_t{}), std::true_type{});
+template <typename T>
+std::false_type hasSetBufferSize(...);
+
+template <typename T, typename Tag>
+bool setBufferSizeIfAvailable(T& audioDevice, size_t bytes, Tag) {
+  return audioDevice.setBufferSize(bytes);
+}
+
+template <typename T>
+bool setBufferSizeIfAvailable(T&, size_t, std::false_type) {
+  return true;
+}
 
 static PlayerState g_state    = STATE_IDLE;
 static int         g_track    = 0;
@@ -636,13 +653,18 @@ static void setupAudio() {
   printStatus("AUD", "Initializing...");
   audio.setPinout(PIN_I2S_BCLK, PIN_I2S_LRC, PIN_I2S_DOUT);
   const size_t bufferBytes = 8 * 1024;
-  if (!audio.setBufferSize(bufferBytes)) {
+  using HasSetBufferSize = decltype(hasSetBufferSize<Audio>(0));
+  const bool bufferConfigured = setBufferSizeIfAvailable(audio, bufferBytes, HasSetBufferSize{});
+  if (!bufferConfigured) {
     printError("Audio buffer allocation failed!");
     printTimestamp();
     Serial.printf("     Requested %u bytes. Enable PSRAM (if available) for larger buffers.\n",
                   static_cast<unsigned int>(bufferBytes));
     g_state = STATE_ERROR;
     return;
+  }
+  if (!HasSetBufferSize::value) {
+    printStatus("AUD", "Audio library uses default buffer size");
   }
   audio.setVolume(g_volume);
   printSuccess("Audio ready");
