@@ -199,6 +199,9 @@ Install via Arduino Library Manager:
 | Library | Author | Search Term |
 |---------|--------|-------------|
 | ESP32-audioI2S | schreibfaul1 | "ESP32-audioI2S" |
+| ESP32Servo (optional, for servo spin) | Kevin Harrington and John K. Bennett | "ESP32Servo" |
+
+> Note: The optional servo spin requires **ESP32Servo**. The stock Arduino `Servo` library is incompatible with the ESP32-S3 core 3.3.x.
 
 ## ⚙️ Arduino IDE Settings
 

@@ -103,7 +103,7 @@
 #include <SD.h>
 #include <FS.h>
 #include <SPI.h>
-#include <Servo.h>
+#include <ESP32Servo.h>
 #include <type_traits>
 #include <utility>
 
@@ -837,7 +837,7 @@ void setup() {
   printSuccess("LED ready");
 
   // Servo PWM
-  g_servo.attach(PIN_SERVO_CTRL);
+  g_servo.attach(PIN_SERVO_CTRL, 500, 2500);
   setServoPulseUs(SERVO_STOP_US);
   printSuccess("Servo ready");
   printStatus("SERVO", "Default off (hold button 5s to enable)");
