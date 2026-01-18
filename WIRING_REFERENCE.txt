@@ -53,9 +53,8 @@
    D3         │  GPIO4  │  Encoder CLK     │  Rotary Encoder CLK (rotation)
    D4         │  GPIO5  │  Encoder DT      │  Rotary Encoder DT (direction)
    D5         │  GPIO6  │  Encoder SW      │  Rotary Encoder SW (push button)
-   D8         │  GPIO7  │  LED Blue        │  RGB LED Blue + 220Ω resistor
-   D9         │  GPIO8  │  LED Green       │  RGB LED Green + 220Ω resistor
-   D10        │  GPIO9  │  LED Red         │  RGB LED Red + 220Ω resistor
+   D6         │  GPIO43 │  LED Green       │  LED Green + 220Ω resistor
+   D7         │  GPIO44 │  LED Blue        │  LED Blue + 220Ω resistor
    3V3        │  -      │  3.3V Power      │  Encoder VCC, MAX98357A VIN
    GND        │  -      │  Ground          │  All component grounds
    5V         │  -      │  5V Power        │  (optional: MAX98357A for louder)
@@ -150,35 +149,32 @@
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  RGB LED                                                                      │
+│  DUAL-COLOR LED                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 
    COMMON CATHODE LED (most common - connect common pin to GND):
    ─────────────────────────────────────────────────────────────────────────────
 
                     220Ω
-   D10 (GPIO9) ────/\/\/\────┐
-                             │   ┌─────┐
-                    220Ω     ├───│ RED │
-   D9  (GPIO8) ────/\/\/\────┼───│ GRN │──── LED
-                             ├───│ BLU │
-                    220Ω     │   └─────┘
-   D8  (GPIO7) ────/\/\/\────┘
-                                   │
-   GND ────────────────────────────┘ (Common Cathode to GND)
+   D6  (GPIO43) ───/\/\/\────┐
+                              │   ┌─────┐
+                    220Ω     ├───│ GRN │
+   D7  (GPIO44) ───/\/\/\────┼───│ BLU │──── LED
+                              │   └─────┘
+   GND ──────────────────────┘ (Common Cathode to GND)
 
-   In code: RGB_ACTIVE_LOW = false (HIGH turns LED on)
+   In code: LED_ACTIVE_LOW = false (HIGH turns LED on)
 
    COMMON ANODE LED (connect common pin to 3V3):
    ─────────────────────────────────────────────────────────────────────────────
    Same wiring, but connect common pin to 3V3 instead of GND.
-   In code: RGB_ACTIVE_LOW = true (LOW turns LED on)
+   In code: LED_ACTIVE_LOW = true (LOW turns LED on)
 
    RESISTOR VALUES:
    ─────────────────────────────────────────────────────────────────────────────
    220Ω = bright, 330Ω = medium, 470Ω = dim
    Without resistors you WILL burn out the LED or GPIO pins!
-   All three colors should use similar resistor values for balanced white.
+   All colors should use similar resistor values for balanced mixes.
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -210,15 +206,15 @@
 
    State              LED Effect
   ─────────────────────────────────────────
-   Playing            Breathing rainbow glow
+   Playing            Breathing green/blue glow
    Track change       Solid color (1.5 sec)
    Paused / Sleep     LED off (low power)
-   Error              Pulsing red
+   Error              Pulsing green
 
    Track Colors:
-     1: Red        4: Green      7: Purple
-     2: Orange     5: Cyan       8: Pink
-     3: Yellow     6: Blue       9: White
+     1: Green      4: Mint       7: Sea
+     2: Blue       5: Azure      8: Sky
+     3: Cyan       6: Teal       9: White
 
 
 ┌───────────────────────────────────────────────────────────────────────────────┐
