@@ -534,6 +534,15 @@ static void scanTracks() {
 static void setupAudio() {
   printStatus("AUD", "Initializing...");
   audio.setPinout(PIN_I2S_BCLK, PIN_I2S_LRC, PIN_I2S_DOUT);
+  const size_t bufferBytes = 8 * 1024;
+  if (!audio.setBufferSize(bufferBytes)) {
+    printError("Audio buffer allocation failed!");
+    printTimestamp();
+    Serial.printf("     Requested %u bytes. Enable PSRAM (if available) for larger buffers.\n",
+                  static_cast<unsigned int>(bufferBytes));
+    g_state = STATE_ERROR;
+    return;
+  }
   audio.setVolume(g_volume);
   printSuccess("Audio ready");
   printVolumeBar(g_volume);
