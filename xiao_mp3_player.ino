@@ -103,6 +103,7 @@
 #include <SD.h>
 #include <FS.h>
 #include <SPI.h>
+#include <Servo.h>
 #include <type_traits>
 #include <utility>
 
@@ -190,8 +191,6 @@
 #define RAINBOW_INTERVAL_MS 50
 
 // Servo PWM (continuous rotation)
-#define SERVO_PWM_FREQ      50
-#define SERVO_PWM_BITS      16
 #define SERVO_STOP_US       1500
 #define SERVO_RECORD_US     1660
 #define SERVO_START_US      1750
@@ -258,6 +257,7 @@ static bool        g_servoBoosting = false;
 static unsigned long g_servoSkidUntil = 0;
 static unsigned long g_servoBoostUntil = 0;
 static int         g_servoMode = 0;
+static Servo       g_servo;
 
 static int           g_encLastCLK  = HIGH;
 static unsigned long g_encLastTime = 0;
@@ -278,14 +278,8 @@ static unsigned long g_startTime = 0;
 // SERVO CONTROL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-static uint32_t servoPulseToDuty(uint16_t us) {
-  const uint32_t maxDuty = (1U << SERVO_PWM_BITS) - 1;
-  const uint32_t periodUs = 1000000UL / SERVO_PWM_FREQ;
-  return static_cast<uint32_t>((static_cast<uint64_t>(us) * maxDuty) / periodUs);
-}
-
 static void setServoPulseUs(uint16_t us) {
-  ledcWrite(PIN_SERVO_CTRL, servoPulseToDuty(us));
+  g_servo.writeMicroseconds(us);
 }
 
 static void stopServo() {
@@ -832,7 +826,6 @@ void setup() {
   pinMode(PIN_ENC_CLK, INPUT_PULLUP);
   pinMode(PIN_ENC_DT, INPUT_PULLUP);
   pinMode(PIN_ENC_SW, INPUT_PULLUP);
-  pinMode(PIN_SERVO_CTRL, OUTPUT);
   g_encLastCLK = digitalRead(PIN_ENC_CLK);
   printSuccess("GPIO ready");
   
@@ -844,7 +837,7 @@ void setup() {
   printSuccess("LED ready");
 
   // Servo PWM
-  ledcAttach(PIN_SERVO_CTRL, SERVO_PWM_FREQ, SERVO_PWM_BITS);
+  g_servo.attach(PIN_SERVO_CTRL);
   setServoPulseUs(SERVO_STOP_US);
   printSuccess("Servo ready");
   printStatus("SERVO", "Default off (hold button 5s to enable)");
