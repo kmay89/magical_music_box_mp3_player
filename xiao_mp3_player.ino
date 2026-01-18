@@ -317,6 +317,8 @@ static void printWelcome() {
   Serial.println(F("│    D3/GPIO4 -> CLK     GND -> All grounds                 │"));
   Serial.println(F("│    D4/GPIO5 -> DT                                         │"));
   Serial.println(F("│    D5/GPIO6 -> SW                                         │"));
+  Serial.println(F("│    SD -> FLOAT/VIN (GND = mute)                           │"));
+  Serial.println(F("│    GAIN -> optional (NC/GND/VIN for boost)                │"));
   Serial.println(F("│                                                           │"));
   Serial.println(F("│  Press encoder to start...                                │"));
   Serial.println(F("└───────────────────────────────────────────────────────────┘"));
