@@ -101,6 +101,7 @@
 #include <SD.h>
 #include <FS.h>
 #include <SPI.h>
+#include <driver/i2s.h>
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSION
@@ -333,6 +334,87 @@ static void printError(const char* msg) {
 static void printSuccess(const char* msg) {
   printTimestamp();
   Serial.printf("[OK]  %s\n", msg);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// I2S TEST TONE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+static bool setupI2SForTone() {
+  i2s_config_t config = {};
+  config.mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_TX);
+  config.sample_rate = 44100;
+  config.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+  config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
+  config.communication_format = I2S_COMM_FORMAT_I2S;
+  config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
+  config.dma_buf_count = 8;
+  config.dma_buf_len = 256;
+  config.use_apll = false;
+  config.tx_desc_auto_clear = true;
+  config.fixed_mclk = 0;
+
+  if (i2s_driver_install(I2S_NUM_0, &config, 0, nullptr) != ESP_OK) {
+    printError("I2S driver install failed");
+    return false;
+  }
+
+  i2s_pin_config_t pins = {};
+  pins.bck_io_num = PIN_I2S_BCLK;
+  pins.ws_io_num = PIN_I2S_LRC;
+  pins.data_out_num = PIN_I2S_DOUT;
+  pins.data_in_num = I2S_PIN_NO_CHANGE;
+
+  if (i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK) {
+    printError("I2S pin setup failed");
+    i2s_driver_uninstall(I2S_NUM_0);
+    return false;
+  }
+
+  i2s_zero_dma_buffer(I2S_NUM_0);
+  return true;
+}
+
+static void playTone(float amplitude, float freq, uint32_t durationMs) {
+  const int sampleRate = 44100;
+  const int bufferSamples = 256;
+  int16_t buffer[bufferSamples * 2];
+  float phase = 0.0f;
+  float phaseInc = TWO_PI * freq / static_cast<float>(sampleRate);
+  uint32_t totalSamples = (sampleRate * durationMs) / 1000;
+  uint32_t remaining = totalSamples;
+
+  while (remaining > 0) {
+    int batch = (remaining > bufferSamples) ? bufferSamples : remaining;
+    for (int i = 0; i < batch; i++) {
+      float sample = sinf(phase) * amplitude;
+      int16_t s = static_cast<int16_t>(sample * 32767.0f);
+      buffer[i * 2] = s;
+      buffer[i * 2 + 1] = s;
+      phase += phaseInc;
+      if (phase > TWO_PI) phase -= TWO_PI;
+    }
+    size_t bytesWritten = 0;
+    i2s_write(I2S_NUM_0, buffer, batch * sizeof(int16_t) * 2, &bytesWritten, portMAX_DELAY);
+    remaining -= batch;
+  }
+}
+
+static void runI2STestTones() {
+  printStatus("TEST", "I2S tone test (low then high volume)");
+  if (!setupI2SForTone()) return;
+  playTone(0.08f, 1000.0f, 400);
+  delay(200);
+  playTone(0.8f, 1000.0f, 400);
+  i2s_driver_uninstall(I2S_NUM_0);
+  printSuccess("I2S tone test complete");
+}
+
+static void maybeRunI2STestTones() {
+  if (!digitalRead(PIN_ENC_SW)) {
+    printStatus("TEST", "Encoder held on boot → running tone test");
+    runI2STestTones();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -685,6 +767,8 @@ void setup() {
   pinMode(PIN_ENC_SW, INPUT_PULLUP);
   g_encLastCLK = digitalRead(PIN_ENC_CLK);
   printSuccess("GPIO ready");
+
+  maybeRunI2STestTones();
   
   // LED PWM
   ledcAttach(PIN_LED_GREEN, LED_PWM_FREQ, LED_PWM_BITS);

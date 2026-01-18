@@ -193,6 +193,17 @@ Install via Arduino Library Manager:
 
 The ESP32-audioI2S library pulls in WiFi/Network dependencies even though we don't use them. This makes the sketch ~1.8MB, but the default "4MB with spiffs" partition only allows 1.3MB for the app. Selecting "Huge APP" gives 3MB for the app, which is plenty.
 
+## 🧪 I2S Tone Test (No SD Required)
+
+If you suspect the audio chain (I2S pins → MAX98357A → speaker), you can trigger a built-in tone test:
+
+1. Hold the encoder button **while powering on**.
+2. The firmware will emit two beeps on the I2S output:
+   - **Low volume** beep, then
+   - **High volume** beep
+
+This test bypasses MP3 decoding and SD card access, so it’s useful for confirming pure I2S/amp/speaker wiring.
+
 ## 🖥️ Serial Monitor Output
 
 Connect at **115200 baud** to see formatted debug output:
